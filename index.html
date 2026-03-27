@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Match Probability - Football Viz</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0a0e1a; color:#e0e6f0; font-family:"Segoe UI",system-ui,sans-serif; min-height:100vh; overflow-x:hidden; }
+header { background:linear-gradient(135deg,#0d1b2e,#1a2a4a); border-bottom:2px solid #00e5ff22; padding:14px 24px; display:flex; align-items:center; justify-content:space-between; }
+header h1 { font-size:1.25rem; font-weight:700; }
+header h1 span { color:#00e5ff; }
+.live-badge { background:#ff3333; color:#fff; font-size:.65rem; font-weight:800; letter-spacing:1.5px; padding:3px 9px; border-radius:3px; animation:pulse 1.5s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }
+.score { font-size:1.8rem; font-weight:800; color:#fff; letter-spacing:4px; }
+.minute { font-size:.75rem; color:#aac; margin-top:2px; }
+.main { display:grid; grid-template-columns:1fr 340px; gap:16px; padding:16px; max-width:1200px; margin:0 auto; }
+@media(max-width:860px){ .main{grid-template-columns:1fr;} }
+.card { background:#0d1b2e; border:1px solid #1e3050; border-radius:12px; padding:16px; }
+.card h2 { font-size:.85rem; color:#7ab; letter-spacing:1px; text-transform:uppercase; margin-bottom:10px; }
+.side-panel { display:flex; flex-direction:column; gap:14px; }
+.team-a { color:#00e5ff; font-weight:700; }
+.team-b { color:#ff6b35; font-weight:700; }
+.bar-outer { flex:1; height:8px; background:#1a2a3a; border-radius:4px; overflow:hidden; }
+.bar-a { height:100%; background:linear-gradient(90deg,#00e5ff,#0099cc); border-radius:4px; transition:width .5s ease; }
+.bar-b { height:100%; background:linear-gradient(90deg,#ff6b35,#cc3300); border-radius:4px; transition:width .5s ease; }
+.btn-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+button.ev { padding:9px 6px; font-size:.8rem; font-weight:700; border:none; border-radius:7px; cursor:pointer; transition:transform .1s; }
+button.ev:active { transform:scale(.96); }
+.bg1{background:linear-gradient(135deg,#00b4cc,#006688);color:#fff;}
+.bg2{background:linear-gradient(135deg,#cc4400,#882200);color:#fff;}
+.bg3{background:linear-gradient(135deg,#0077aa,#004466);color:#fff;}
+.bg4{background:linear-gradient(135deg,#aa3300,#661100);color:#fff;}
+.bg5{background:linear-gradient(135deg,#990000,#550000);color:#fff;}
+.bg6{background:linear-gradient(135deg,#993300,#551100);color:#fff;}
+.bg7{background:linear-gradient(135deg,#226622,#114411);color:#0f0;}
+.bg8{background:linear-gradient(135deg,#333,#1a1a1a);color:#aaa;border:1px solid #444;}
+.event-log { margin-top:10px; max-height:90px; overflow-y:auto; }
+.log-item { font-size:.72rem; color:#8ab; padding:3px 0; border-bottom:1px solid #1a2a3a; }
+.log-item.g { color:#00e5ff; font-weight:700; }
+.log-item.gb { color:#ff6b35; font-weight:700; }
+.log-item.r { color:#ff4444; }
+.stat-row { display:flex; align-items:center; gap:6px; margin-bottom:8px; font-size:.75rem; }
+.sv { font-weight:700; min-width:28px; }
+.sbw { flex:1; height:5px; background:#1a2a3a; border-radius:3px; overflow:hidden; display:flex; }
+.sba { height:100%; background:#00e5ff; }
+.sbb { height:100%; background:#ff6b35; }
+.sn { color:#7ab; min-width:70px; text-align:center; }
+footer { text-align:center; padding:16px; font-size:.7rem; color:#445; border-top:1px solid #1a2a3a; }
+</style>
+</head>
+<body>
+<header>
+<div>
+<h1>&#x26BD; <span>Football</span> Live Probability</h1>
+<div style="font-size:.7rem;color:#556;margin-top:2px;">2026 FIFA World Cup Simulator</div>
+</div>
+<div style="text-align:center;">
+<div style="font-size:.72rem;color:#7ab;letter-spacing:1px;">LIVE MATCH</div>
+<div class="score"><span id="sa">0</span> &mdash; <span id="sb">0</span></div>
+<div class="minute" id="mn">00'</div>
+</div>
+<span class="live-badge">LIVE</span>
+</header>
+<div class="main">
+<div class="card">
+<h2>Pitch Tracking</h2>
+<canvas id="pitch" style="display:block;width:100%;border-radius:8px;"></canvas>
+<div style="display:flex;justify-content:space-between;margin-top:8px;font-size:.75rem;">
+<span class="team-a">&#9654; Team A</span>
+<span style="color:#556;font-size:.7rem;">Players + Ball</span>
+<span class="team-b">Team B &#9664;</span>
+</div>
+</div>
+<div class="side-panel">
+<div class="card">
+<h2>Win Probability</h2>
+<canvas id="chart" style="display:block;width:100%;"></canvas>
+<div style="display:flex;align-items:center;gap:8px;margin-top:10px;">
+<span class="team-a" style="font-size:.72rem;min-width:38px;" id="pa">50%</span>
+<div class="bar-outer"><div class="bar-a" id="ba" style="width:50%"></div></div>
+<div class="bar-outer" style="direction:rtl;"><div class="bar-b" id="bb" style="width:50%"></div></div>
+<span class="team-b" style="font-size:.72rem;min-width:38px;text-align:right;" id="pb">50%</span>
+</div>
+<div style="text-align:center;font-size:.72rem;color:#8899aa;margin-top:4px;">Draw: <span id="pd">--</span></div>
+</div>
+<div class="card">
+<h2>Match Events</h2>
+<div class="btn-grid">
+<button class="ev bg1" onclick="ev('ga')">&#x26BD; GOAL A</button>
+<button class="ev bg2" onclick="ev('gb')">&#x26BD; GOAL B</button>
+<button class="ev bg3" onclick="ev('pa')">&#x1F3AF; PEN A</button>
+<button class="ev bg4" onclick="ev('pb')">&#x1F3AF; PEN B</button>
+<button class="ev bg5" onclick="ev('ra')">&#x1F7E5; RED A</button>
+<button class="ev bg6" onclick="ev('rb')">&#x1F7E5; RED B</button>
+<button class="ev bg7" onclick="ev('ca')">&#x1F4A5; Chance A</button>
+<button class="ev bg8" onclick="rst()">&#x21BA; Reset</button>
+</div>
+<div class="event-log" id="elog"></div>
+</div>
+<div class="card">
+<h2>Match Stats</h2>
+<div id="sgrid"></div>
+</div>
+</div>
+</div>
+<footer>Open Source &middot; dusgus1/football-live-viz &middot; Built for 2026 World Cup</footer>
+<script>
+var pC=document.getElementById("pitch"),cC=document.getElementById("chart");
+var pX=pC.getContext("2d"),cX=cC.getContext("2d");
+var min=0,sA=0,sB=0,pA=0.5,pHist=[0.5];
+var posA=50,shA=0,shB=0,corA=0,corB=0;
+var bx=0.5,by=0.5,bvx=0.003,bvy=0.002;
+var plrs=[],W,H,PW,PH,OX,OY,gf=0,gft=0,tick=0;
+function ip(){
+plrs=[];
+for(var i=0;i<11;i++) plrs.push({t:"a",x:.08+Math.random()*.4,y:.1+Math.random()*.8,vx:(Math.random()-.5)*.004,vy:(Math.random()-.5)*.004});
+for(var i=0;i<11;i++) plrs.push({t:"b",x:.52+Math.random()*.4,y:.1+Math.random()*.8,vx:(Math.random()-.5)*.004,vy:(Math.random()-.5)*.004});
+}
+function rs(){
+W=pC.parentElement.clientWidth-32; H=Math.round(W*.65);
+pC.width=W; pC.height=H;
+PW=W*.88; PH=H*.88; OX=(W-PW)/2; OY=(H-PH)/2;
+cC.width=cC.parentElement.clientWidth-32; cC.height=120;
+}
+function dp(){
+pX.fillStyle="#2d5a1b"; pX.fillRect(0,0,W,H);
+for(var i=0;i<10;i++){ if(i%2){pX.fillStyle="rgba(0,0,0,.06)"; pX.fillRect(OX+i*(PW/10),OY,PW/10,PH);} }
+pX.strokeStyle="#ffffff44"; pX.lineWidth=1.5;
+pX.strokeRect(OX,OY,PW,PH);
+pX.beginPath(); pX.moveTo(OX+PW/2,OY); pX.lineTo(OX+PW/2,OY+PH); pX.stroke();
+pX.beginPath(); pX.arc(OX+PW/2,OY+PH/2,PH*.14,0,Math.PI*2); pX.stroke();
+pX.beginPath(); pX.arc(OX+PW/2,OY+PH/2,3,0,Math.PI*2); pX.fillStyle="#fff"; pX.fill();
+pX.strokeRect(OX,OY+(PH-PH*.15)/2,PH*.07,PH*.15);
+pX.strokeRect(OX+PW-PH*.07,OY+(PH-PH*.15)/2,PH*.07,PH*.15);
+pX.strokeRect(OX,OY+(PH-PH*.25)/2,PH*.16,PH*.25);
+pX.strokeRect(OX+PW-PH*.16,OY+(PH-PH*.25)/2,PH*.16,PH*.25);
+pX.beginPath(); pX.arc(OX+PH*.11,OY+PH/2,PH*.07,-Math.PI/2,Math.PI/2); pX.stroke();
+pX.beginPath(); pX.arc(OX+PW-PH*.11,OY+PH/2,PH*.07,Math.PI/2,3*Math.PI/2); pX.stroke();
+if(gf>0){ var al=gf/30; pX.fillStyle=gft===0?"rgba(0,229,255,"+al+")":"rgba(255,107,53,"+al+")"; pX.fillRect(0,0,W,H); pX.fillStyle="#fff"; pX.font="bold "+Math.round(H*.12)+"px sans-serif"; pX.textAlign="center"; pX.fillText("GOAL!",W/2,H/2+H*.04); gf--; }
+}
+function dpl(){
+plrs.forEach(function(p){
+var x=OX+p.x*PW,y=OY+p.y*PH,r=Math.max(5,PH*.025);
+var g=pX.createRadialGradient(x-r*.3,y-r*.3,r*.1,x,y,r);
+if(p.t==="a"){g.addColorStop(0,"#4df0ff");g.addColorStop(1,"#0077aa");}
+else{g.addColorStop(0,"#ffaa77");g.addColorStop(1,"#cc4400");}
+pX.beginPath(); pX.arc(x,y,r,0,Math.PI*2); pX.fillStyle=g; pX.fill();
+pX.strokeStyle="#ffffff33"; pX.lineWidth=1; pX.stroke();
+});
+}
+function dbl(){
+var x=OX+bx*PW,y=OY+by*PH,r=Math.max(5,PH*.02);
+var g=pX.createRadialGradient(x-r*.4,y-r*.4,r*.1,x,y,r);
+g.addColorStop(0,"#fff"); g.addColorStop(.5,"#ddd"); g.addColorStop(1,"#aaa");
+pX.beginPath(); pX.arc(x,y,r,0,Math.PI*2); pX.fillStyle=g; pX.fill();
+pX.strokeStyle="#555"; pX.lineWidth=1; pX.stroke();
+}
+function dc(){
+cX.fillStyle="#0a1525"; cX.fillRect(0,0,cC.width,cC.height);
+var W2=cC.width,H2=cC.height;
+for(var i=0;i<=4;i++){var gy=H2*.1+i*(H2*.8/4); cX.strokeStyle="#1a2a3a"; cX.lineWidth=1; cX.beginPath(); cX.moveTo(28,gy); cX.lineTo(W2,gy); cX.stroke();}
+cX.fillStyle="#334455"; cX.font="10px sans-serif"; cX.textAlign="right";
+["100","75","50","25","0"].forEach(function(t,i){cX.fillText(t,26,H2*.1+i*(H2*.8/4)+4);});
+cX.strokeStyle="#1a2a3a"; cX.beginPath(); cX.moveTo(W2/2,H2*.05); cX.lineTo(W2/2,H2*.95); cX.stroke();
+if(pHist.length>1){
+var n=pHist.length,xS=(W2-30)/90;
+cX.beginPath();
+var lg=cX.createLinearGradient(30,0,W2,0);
+lg.addColorStop(0,"#00e5ff"); lg.addColorStop(1,"#0099cc");
+cX.strokeStyle=lg; cX.lineWidth=2.5;
+pHist.forEach(function(v,i){
+var xp=30+i*xS,yp=H2*.1+(1-v)*H2*.8;
+if(i===0)cX.moveTo(xp,yp);else cX.lineTo(xp,yp);
+});
+cX.stroke();
+var lx=30+(n-1)*xS,ly=H2*.1+(1-pHist[n-1])*H2*.8;
+cX.beginPath(); cX.arc(lx,ly,4,0,Math.PI*2); cX.fillStyle="#00e5ff"; cX.fill();
+cX.fillStyle="#00e5ff"; cX.font="bold 10px sans-serif"; cX.textAlign="right";
+cX.fillText(Math.round(pA*100)+"%",W2-4,ly-5);
+}
+cX.fillStyle="#8899aa"; cX.font="9px sans-serif"; cX.textAlign="left";
+cX.fillText("Team A Win %",30,H2*.1-2);
+}
+function uu(){
+document.getElementById("sa").textContent=sA;
+document.getElementById("sb").textContent=sB;
+document.getElementById("mn").textContent=min+"'";
+var a=Math.round(pA*100),b=100-a;
+document.getElementById("pa").textContent=a+"%";
+document.getElementById("pb").textContent=b+"%";
+document.getElementById("ba").style.width=a+"%";
+document.getElementById("bb").style.width=b+"%";
+document.getElementById("pd").textContent=Math.round(Math.max(0,20-(Math.abs(a-50)*.5)))+"%";
+var data=[{n:"Possession",a:posA+"%",b:(100-posA)+"%",r:posA/100},{n:"Shots",a:shA,b:shB,r:shA/(shA+shB+.001)},{n:"Corners",a:corA,b:corB,r:corA/(corA+corB+.001)},{n:"Goals",a:sA,b:sB,r:sA/(sA+sB+.001)}];
+var g=document.getElementById("sgrid"); g.innerHTML="";
+data.forEach(function(d){
+var row=document.createElement("div"); row.className="stat-row";
+row.innerHTML='<span class="sv team-a">'+d.a+'</span><div class="sbw"><div class="sba" style="width:'+Math.round(d.r*100)+'%"></div><div class="sbb" style="width:'+Math.round((1-d.r)*100)+'%"></div></div><span class="sv team-b">'+d.b+'</span><span class="sn">'+d.n+'</span>';
+g.appendChild(row);
+});
+}
+function alog(txt,cls){
+var el=document.getElementById("elog");
+var d=document.createElement("div"); d.className="log-item "+(cls||"");
+var m=String(min); while(m.length<2)m="0"+m;
+d.innerHTML=m+"'&nbsp;"+txt; el.insertBefore(d,el.firstChild);
+}
+function c01(v){return Math.max(.01,Math.min(.99,v));}
+function ev(t){
+if(t==="ga"){sA++;pA=c01(pA+.12+Math.random()*.05);gf=35;gft=0;shA++;alog("GOAL! Team A","g");}
+else if(t==="gb"){sB++;pA=c01(pA-.12-Math.random()*.05);gf=35;gft=1;shB++;alog("GOAL! Team B","gb");}
+else if(t==="pa"){pA=c01(pA+.07+Math.random()*.03);shA++;alog("Penalty to Team A","");}
+else if(t==="pb"){pA=c01(pA-.07-Math.random()*.03);shB++;alog("Penalty to Team B","");}
+else if(t==="ra"){pA=c01(pA-.15);alog("Red card Team A","r");}
+else if(t==="rb"){pA=c01(pA+.15);alog("Red card Team B","r");}
+else if(t==="ca"){pA=c01(pA+.04+Math.random()*.03);shA++;alog("Big chance! Team A","");}
+uu();
+}
+function rst(){
+min=0;sA=0;sB=0;pA=.5;pHist=[.5];posA=50;shA=0;shB=0;corA=0;corB=0;
+document.getElementById("elog").innerHTML=""; bx=.5;by=.5; ip(); uu();
+}
+function uball(){
+bx+=bvx+(Math.random()-.5)*.003; by+=bvy+(Math.random()-.5)*.003;
+if(bx<.02||bx>.98){bvx*=-1;bx=Math.max(.02,Math.min(.98,bx));}
+if(by<.02||by>.98){bvy*=-1;by=Math.max(.02,Math.min(.98,by));}
+bvx+=(Math.random()-.5)*.0015; bvy+=(Math.random()-.5)*.0015;
+bvx=Math.max(-.008,Math.min(.008,bvx)); bvy=Math.max(-.008,Math.min(.008,bvy));
+}
+function upl(){
+plrs.forEach(function(p){
+var dx=bx-p.x,dy=by-p.y,dist=Math.sqrt(dx*dx+dy*dy)+.001;
+var pull=(p.t==="a"&&bx>.5||p.t==="b"&&bx<.5)?0.0007:0.0002;
+p.vx+=(dx/dist)*pull+(Math.random()-.5)*.001;
+p.vy+=(dy/dist)*pull+(Math.random()-.5)*.001;
+p.vx=Math.max(-.007,Math.min(.007,p.vx)); p.vy=Math.max(-.007,Math.min(.007,p.vy));
+p.x+=p.vx; p.y+=p.vy;
+if(p.x<.02||p.x>.98){p.vx*=-.7;p.x=Math.max(.02,Math.min(.98,p.x));}
+if(p.y<.02||p.y>.98){p.vy*=-.7;p.y=Math.max(.02,Math.min(.98,p.y));}
+});
+}
+function loop(){
+tick++;
+if(tick%45===0&&min<90){
+min++;
+var d=(Math.random()-.5)*.015+(sA>sB?-.003:sB>sA?.003:0);
+pA=c01(pA+d);
+pHist.push(pA);
+posA=Math.round(Math.max(30,Math.min(70,50+(pA-.5)*30+(Math.random()-.5)*4)));
+if(Math.random()<.015)shA++;
+if(Math.random()<.012)shB++;
+if(Math.random()<.008)corA++;
+if(Math.random()<.008)corB++;
+uu();
+}
+uball(); upl(); dp(); dpl(); dbl(); dc();
+requestAnimationFrame(loop);
+}
+window.addEventListener("resize",function(){rs();});
+rs(); ip(); uu();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
